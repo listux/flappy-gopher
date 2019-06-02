@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
-	"github.com/veandco/go-sdl2/img"
 	"os"
+	"runtime"
 	"time"
 )
 
@@ -40,15 +40,25 @@ func run() error {
 		return fmt.Errorf("could not draw title: %v", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 
-	if err := drawBackground(r); err != nil {
-		return fmt.Errorf("could not draw background: %v", err)
+	s, err := newScene(r)
+	if err != nil {
+		return fmt.Errorf("could not create scene: %v", err)
 	}
+	defer s.destroy()
 
-	time.Sleep(5 * time.Second)
+	events := make(chan sdl.Event)
+	errc := s.run(events, r)
 
-	return nil
+	runtime.LockOSThread()
+	for {
+		select {
+		case events <- sdl.WaitEvent():
+		case err := <-errc:
+			return err
+		}
+	}
 }
 
 func drawTitle(r *sdl.Renderer) error {
@@ -75,23 +85,6 @@ func drawTitle(r *sdl.Renderer) error {
 
 	if err := r.Copy(t, nil, nil); err != nil {
 		return fmt.Errorf("could not copy texture: %v", err)
-	}
-
-	r.Present()
-	return nil
-}
-
-func drawBackground(r *sdl.Renderer) error{
-	r.Clear()
-
-	t, err := img.LoadTexture(r, "res/img/background.png")
-	if err != nil {
-		return fmt.Errorf("could not load background image: %v", err)
-	}
-	t.Destroy()
-
-	if err := r.Copy(t, nil, nil); err != nil {
-		return fmt.Errorf("could not copy background: %v", err)
 	}
 
 	r.Present()
